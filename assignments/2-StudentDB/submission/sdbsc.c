@@ -431,9 +431,45 @@ void print_student(student_t *s)
  */
 int compress_db(int fd)
 {
-    // TODO
-    printf(M_NOT_IMPL);
-    return fd;
+    student_t student;
+    int temp_fd = open(TMP_DB_FILE, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (temp_fd == -1) {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    if (lseek(fd, 0, SEEK_SET) == -1) {
+        printf(M_ERR_DB_READ);
+        close(temp_fd);
+        return ERR_DB_FILE;
+    }
+
+    while (read(fd, &student, sizeof(student_t)) == sizeof(student_t)) {
+        if (memcmp(&student, &EMPTY_STUDENT_RECORD, sizeof(student_t)) != 0) {
+            if (write(temp_fd, &student, sizeof(student_t)) != sizeof(student_t)) {
+                printf(M_ERR_DB_WRITE);
+                close(temp_fd);
+                return ERR_DB_FILE;
+            }
+        }
+    }
+
+    close(fd);
+    close(temp_fd);
+
+    if (rename(TMP_DB_FILE, DB_FILE) == -1) {
+        printf(M_ERR_DB_CREATE);
+        return ERR_DB_FILE;
+    }
+
+    int new_fd = open(DB_FILE, O_RDWR);
+    if (new_fd == -1) {
+        printf(M_ERR_DB_OPEN);
+        return ERR_DB_FILE;
+    }
+
+    printf(M_DB_COMPRESSED_OK);
+    return new_fd;
 }
 
 /*
