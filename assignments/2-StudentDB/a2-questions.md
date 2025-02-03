@@ -5,7 +5,7 @@ Please answer the following questions and submit in your repo for the second ass
 
 1. In this assignment I asked you provide an implementation for the `get_student(...)` function because I think it improves the overall design of the database application.   After you implemented your solution do you agree that externalizing `get_student(...)` into it's own function is a good design strategy?  Briefly describe why or why not.
 
-    > **Answer**:  _start here_
+    > **Answer**:  Yes, externalizing get_student(...) is a good design choice because it improves reusability, readability, and maintainability. It avoids code duplication, makes updates easier, and keeps functions focused on single responsibilities
 
 2. Another interesting aspect of the `get_student(...)` function is how its function prototype requires the caller to provide the storage for the `student_t` structure:
 
@@ -39,7 +39,7 @@ Please answer the following questions and submit in your repo for the second ass
     ```
     Can you think of any reason why the above implementation would be a **very bad idea** using the C programming language?  Specifically, address why the above code introduces a subtle bug that could be hard to identify at runtime? 
 
-    > **ANSWER:** _start here_
+    > **ANSWER:** I think accessing this pointer leads to undefined behavior, which can cause random crashes or data corruption then making the bug hard to detect at runtime.
 
 3. Another way the `get_student(...)` function could be implemented is as follows:
 
@@ -72,7 +72,7 @@ Please answer the following questions and submit in your repo for the second ass
     ```
     In this implementation the storage for the student record is allocated on the heap using `malloc()` and passed back to the caller when the function returns. What do you think about this alternative implementation of `get_student(...)`?  Address in your answer why it work work, but also think about any potential problems it could cause.  
     
-    > **ANSWER:** _start here_  
+    > **ANSWER:** This works because malloc allocates memory on the heap, avoiding invalid pointers. However, it risks memory leaks if the caller forgets to free, adds overhead from frequent allocations, and complicates error handling. Using caller-provided storage is safer and more efficient. Just realized that this would be a good idea for me to implement as well if that was possible :)
 
 
 4. Lets take a look at how storage is managed for our simple database. Recall that all student records are stored on disk using the layout of the `student_t` structure (which has a size of 64 bytes).  Lets start with a fresh database by deleting the `student.db` file using the command `rm ./student.db`.  Now that we have an empty database lets add a few students and see what is happening under the covers.  Consider the following sequence of commands:
@@ -102,11 +102,15 @@ Please answer the following questions and submit in your repo for the second ass
 
     - Please explain why the file size reported by the `ls` command was 128 bytes after adding student with ID=1, 256 after adding student with ID=3, and 4160 after adding the student with ID=64? 
 
-        > **ANSWER:** _start here_
+        > **ANSWER:** ls shows the logical file size, based on the highest byte written:
+    ID=1 → 128 bytes
+    ID=3 → 256 bytes
+    ID=64 → 4160 bytes
+    'du' shows actual disk space, which is smaller due to sparse files—Linux skips allocating space for gaps. Space grows in 4 KB blocks, so du stays at 4 KB until ID=64, then jumps to 8 KB.
 
     -   Why did the total storage used on the disk remain unchanged when we added the student with ID=1, ID=3, and ID=63, but increased from 4K to 8K when we added the student with ID=64? 
 
-        > **ANSWER:** _start here_
+        > **ANSWER:** The storage stayed at 4K for IDs 1, 3, and 63 because the data fit within a single 4 KB block, and gaps were handled as sparse holes without using extra space. Adding ID=64 crossed the 4 KB limit, requiring an additional block, increasing disk usage to 8K
 
     - Now lets add one more student with a large student ID number  and see what happens:
 
@@ -119,4 +123,4 @@ Please answer the following questions and submit in your repo for the second ass
         ```
         We see from above adding a student with a very large student ID (ID=99999) increased the file size to 6400000 as shown by `ls` but the raw storage only increased to 12K as reported by `du`.  Can provide some insight into why this happened?
 
-        > **ANSWER:**  _start here_
+        > **ANSWER:**  The file size is 6400000 because the student record for ID=99999 is stored at an offset far from the start, creating a large gap. Linux handles this gap as a sparse hole, which doesn't use real disk space. The actual storage increased slightly to 12K due to metadata and the few blocks needed to store the non-empty data
