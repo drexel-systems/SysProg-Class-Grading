@@ -270,3 +270,27 @@ EOF
     # Assertions
     [ "$status" -eq 0 ]
 }
+
+@test "Multiple commands with mixed redirection" {
+    # Create a test file with sample data
+    echo -e "apple\nbanana\ncherry\n" > fruits.txt
+    
+    # Run the command with redirection
+    run "./dsh" <<EOF
+cat fruits.txt | grep apple > output.txt
+EOF
+
+    # Check if output.txt exists and contains the correct result
+    if [ -f output.txt ]; then
+        output_content=$(cat output.txt)
+    else
+        output_content=""
+    fi
+
+    # Clean up
+    rm -f fruits.txt output.txt
+
+    # Assertions
+    [[ "$output_content" == "apple" ]] && [ "$status" -eq 0 ]
+}
+

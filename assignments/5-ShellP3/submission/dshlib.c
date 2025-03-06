@@ -22,6 +22,9 @@ int alloc_cmd_buff(cmd_buff_t *cmd_buff) {
     for (int i = 0; i < CMD_ARGV_MAX; i++) {
         cmd_buff->argv[i] = NULL;
     }
+    cmd_buff->input_file = NULL;
+    cmd_buff->output_file = NULL;
+    cmd_buff->append_output = false;
     return OK;
 }
 
@@ -36,6 +39,15 @@ int free_cmd_buff(cmd_buff_t *cmd_buff) {
     for (int i = 0; i < CMD_ARGV_MAX; i++) {
         cmd_buff->argv[i] = NULL;
     }
+    if (cmd_buff->input_file) {
+        free(cmd_buff->input_file);
+        cmd_buff->input_file = NULL;
+    }
+    if (cmd_buff->output_file) {
+        free(cmd_buff->output_file);
+        cmd_buff->output_file = NULL;
+    }
+    cmd_buff->append_output = false;
     return OK;
 }
 
@@ -44,6 +56,15 @@ int clear_cmd_buff(cmd_buff_t *cmd_buff) {
     for (int i = 0; i < CMD_ARGV_MAX; i++) {
         cmd_buff->argv[i] = NULL;
     }
+    if (cmd_buff->input_file) {
+        free(cmd_buff->input_file);
+        cmd_buff->input_file = NULL;
+    }
+    if (cmd_buff->output_file) {
+        free(cmd_buff->output_file);
+        cmd_buff->output_file = NULL;
+    }
+    cmd_buff->append_output = false;
     return OK;
 }
 
@@ -81,6 +102,30 @@ int build_cmd_buff(char *cmd_line, cmd_buff_t *cmd_buff) {
                 cmd_buff->argv[cmd_buff->argc++] = start;
             }
             start = token + 1;
+        } else if (!in_quotes && *token == '<') {
+            *token = '\0';
+            cmd_buff->argv[cmd_buff->argc++] = start;
+            start = token + 1;
+            while (isspace(*start)) start++;
+            char *file_start = start;
+            while (!isspace(*start) && *start != '\0') start++;
+            *start = '\0';
+            cmd_buff->input_file = strdup(file_start);
+            start++;
+        } else if (!in_quotes && *token == '>') {
+            *token = '\0';
+            cmd_buff->argv[cmd_buff->argc++] = start;
+            start = token + 1;
+            if (*start == '>') {
+                cmd_buff->append_output = true;
+                start++;
+            }
+            while (isspace(*start)) start++;
+            char *file_start = start;
+            while (!isspace(*start) && *start != '\0') start++;
+            *start = '\0';
+            cmd_buff->output_file = strdup(file_start);
+            start++;
         }
         token++;
     }
@@ -138,6 +183,40 @@ int exec_cmd(cmd_buff_t *cmd) {
     }
 
     if (pid == 0) {
+        // Check if the input and output files are the same
+        if (cmd->input_file && cmd->output_file && strcmp(cmd->input_file, cmd->output_file) == 0) {
+            fprintf(stderr, "Cannot redirect input and output to the same file: %s\n", cmd->input_file);
+            exit(1);
+        }
+
+        // Handle input redirection
+        if (cmd->input_file) {
+            int fd_in = open(cmd->input_file, O_RDONLY);
+            if (fd_in < 0) {
+                perror("open input file");
+                exit(1);
+            }
+            dup2(fd_in, STDIN_FILENO);
+            close(fd_in);
+        }
+
+        // Handle output redirection
+        if (cmd->output_file) {
+            int fd_out;
+            if (cmd->append_output) {
+                fd_out = open(cmd->output_file, O_WRONLY | O_CREAT | O_APPEND, 0644);
+            } else {
+                fd_out = open(cmd->output_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+            }
+            if (fd_out < 0) {
+                perror("open output file");
+                exit(1);
+            }
+            dup2(fd_out, STDOUT_FILENO);
+            close(fd_out);
+        }
+
+        // Execute the command
         execvp(cmd->argv[0], cmd->argv);
         perror("execvp");
         exit(1);
@@ -342,15 +421,24 @@ int exec_local_cmd_loop() {
     }
 
     while(1) {
+        // Print the prompt, but only the prompt itself
         printf("%s", SH_PROMPT);
 
+        // Get the command input
         if (fgets(cmd_buff, ARG_MAX, stdin) == NULL) {
             printf("\n");
             break;
         }
 
+        // Remove any trailing newline character from the input
         cmd_buff[strcspn(cmd_buff, "\n")] = '\0';
 
+        // Make sure no extra prompt characters are included
+        if (cmd_buff[0] == '\0') {
+            continue;  // Skip empty inputs
+        }
+
+        // Check if the command includes a pipe
         if (strchr(cmd_buff, PIPE_CHAR) != NULL) {
             rc = build_cmd_list(cmd_buff, &cmd_list);
 
@@ -399,3 +487,4 @@ int exec_local_cmd_loop() {
 
     return rc;
 }
+
