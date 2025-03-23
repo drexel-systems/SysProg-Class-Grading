@@ -90,37 +90,63 @@
  *   function after cleaning things up.  See the documentation for client_cleanup()
  *      
  */
-int exec_remote_cmd_loop(char *address, int port)
-{
-    char *cmd_buff;
-    char *rsp_buff;
+ int exec_remote_cmd_loop(char *address, int port) {
+    char *cmd_buff = malloc(RDSH_COMM_BUFF_SZ);
+    char *rsp_buff = malloc(RDSH_COMM_BUFF_SZ);
     int cli_socket;
     ssize_t io_size;
     int is_eof;
 
-    // TODO set up cmd and response buffs
+    if (!cmd_buff || !rsp_buff) {
+        return client_cleanup(cli_socket, cmd_buff, rsp_buff, ERR_MEMORY);
+    }
 
-    cli_socket = start_client(address,port);
-    if (cli_socket < 0){
-        perror("start client");
+    // Step 1: Start client and check if valid
+    cli_socket = start_client(address, port);
+    if (cli_socket < 0) {
+        perror("start_client failed");
         return client_cleanup(cli_socket, cmd_buff, rsp_buff, ERR_RDSH_CLIENT);
     }
 
-    while (1) 
-    {
-        // TODO print prompt
+    while (1) {
+        // Step 2: Print prompt
+        printf("rsh> ");
+        fflush(stdout);
 
-        // TODO fgets input
+        // Step 3: Get user command
+        if (!fgets(cmd_buff, RDSH_COMM_BUFF_SZ, stdin)) {
+            break;
+        }
 
-        // TODO send() over cli_socket
+        // Step 4: Send command to server
+        if (send(cli_socket, cmd_buff, strlen(cmd_buff), 0) == -1) {
+            perror("send failed");
+            return client_cleanup(cli_socket, cmd_buff, rsp_buff, ERR_RDSH_COMMUNICATION);
+        }
 
-        // TODO recv all the results
+        // Step 5: Receive response from server
+        while (1) {
+            io_size = recv(cli_socket, rsp_buff, RDSH_COMM_BUFF_SZ - 1, 0);
+            if (io_size < 0) {
+                perror("recv failed");
+                return client_cleanup(cli_socket, cmd_buff, rsp_buff, ERR_RDSH_COMMUNICATION);
+            }
+            if (io_size == 0) {
+                printf("Server disconnected.\n");
+                return client_cleanup(cli_socket, cmd_buff, rsp_buff, OK);
+            }
 
-        // TODO break on exit command
+            rsp_buff[io_size] = '\0'; 
+            printf("%.*s", (int)io_size, rsp_buff);
+
+            is_eof = (rsp_buff[io_size - 1] == RDSH_EOF_CHAR);
+            if (is_eof) break;
+        }
     }
 
     return client_cleanup(cli_socket, cmd_buff, rsp_buff, OK);
 }
+
 
 /*
  * start_client(server_ip, port)
@@ -145,16 +171,38 @@ int exec_remote_cmd_loop(char *address, int port)
  *          ERR_RDSH_CLIENT:    If socket() or connect() fail
  * 
  */
-int start_client(char *server_ip, int port){
+ int start_client(char *server_ip, int port) {
     struct sockaddr_in addr;
     int cli_socket;
-    int ret;
 
-    // TODO set up cli_socket
+    // Step 1: Create socket
+    cli_socket = socket(AF_INET, SOCK_STREAM, 0);
+    if (cli_socket == -1) {
+        perror("socket");
+        return ERR_RDSH_CLIENT;
+    }
 
+    // Step 2: Set up server address structure
+    memset(&addr, 0, sizeof(addr));
+    addr.sin_family = AF_INET;
+    addr.sin_port = htons(port);
+    if (inet_pton(AF_INET, server_ip, &addr.sin_addr) <= 0) {
+        perror("inet_pton");
+        close(cli_socket);
+        return ERR_RDSH_CLIENT;
+    }
 
+    // Step 3: Connect to the server
+    if (connect(cli_socket, (struct sockaddr *)&addr, sizeof(addr)) == -1) {
+        perror("connect");
+        close(cli_socket);
+        return ERR_RDSH_CLIENT;
+    }
+
+    printf("Connected to server %s:%d\n", server_ip, port);
     return cli_socket;
 }
+
 
 /*
  * client_cleanup(int cli_socket, char *cmd_buff, char *rsp_buff, int rc)
@@ -181,15 +229,12 @@ int start_client(char *server_ip, int port){
  *      
  */
 int client_cleanup(int cli_socket, char *cmd_buff, char *rsp_buff, int rc){
-    //If a valid socket number close it.
     if(cli_socket > 0){
         close(cli_socket);
     }
 
-    //Free up the buffers 
     free(cmd_buff);
     free(rsp_buff);
 
-    //Echo the return value that was passed as a parameter
     return rc;
 }

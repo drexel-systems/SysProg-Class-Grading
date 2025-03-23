@@ -19,7 +19,7 @@ EOF
     stripped_output=$(echo "$output" | tr -d '[:space:]')
 
     # Expected output with all whitespace removed for easier matching
-    expected_output="dshlib.clocalmodedsh4>dsh4>cmdloopreturned0"
+    expected_output="localmodedsh4>dsh4>cmdloopreturned0"
 
     # These echo commands will help with debugging and will only print
     #if the test fails

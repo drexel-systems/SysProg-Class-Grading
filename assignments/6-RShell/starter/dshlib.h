@@ -1,6 +1,7 @@
 #ifndef __DSHLIB_H__
-    #define __DSHLIB_H__
+#define __DSHLIB_H__
 
+#include <stdbool.h>
 
 //Constants for command structure sizes
 #define EXE_MAX 64
@@ -25,7 +26,8 @@ typedef struct cmd_buff
     char *_cmd_buffer;
     char *input_file;  // extra credit, stores input redirection file (for `<`)
     char *output_file; // extra credit, stores output redirection file (for `>`)
-    bool append_mode; // extra credit, sets append mode fomr output_file
+    bool append_mode;
+    bool append_output; // extra credit, sets append mode fomr output_file
 } cmd_buff_t;
 
 typedef struct command_list{
