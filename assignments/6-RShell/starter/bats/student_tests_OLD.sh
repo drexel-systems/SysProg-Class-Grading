@@ -1,22 +1,8 @@
 #!/usr/bin/env bats
 
 # File: student_tests.sh
-# Test suite for dsh remote shell
-
-SERVER_PORT=5678
-SERVER_IP="127.0.0.1"
-
-setup() {
-    # Start the server in the background before each test
-    ./dsh -s -p $SERVER_PORT -x &  
-    sleep 1  # Allow time for the server to start
-}
-
-teardown() {
-    # Stop the server after each test
-    echo "stop-server" | ./dsh -c $SERVER_IP -p $SERVER_PORT
-    sleep 2  # Allow time for shutdown
-}
+# 
+# Create your unit tests suit in this file
 
 @test "Verify ls command runs correctly" {
     run ./dsh <<EOF                
@@ -234,88 +220,4 @@ EOF
     [ "$status" -eq 0 ]
 }
 
-@test "Check if ls runs without errors" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-ls
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [ -n "$output" ]  # Ensure output is not empty
-}
 
-@test "Check if pwd runs without errors" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-pwd
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"/home"* ]]  # Ensure it prints a valid directory path
-}
-
-@test "Check whoami returns the correct user" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-whoami
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"$(whoami)"* ]]  # Fix: Use `whoami` directly
-}
-
-@test "Check a simple echo command" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-echo Hello, Remote Shell!
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Hello, Remote Shell!"* ]]
-}
-
-@test "Check command chaining with &&" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-mkdir test_dir && cd test_dir && pwd
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"test_dir"* ]]
-}
-
-@test "Check background process execution" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-sleep 2 &
-exit
-EOF
-    [ "$status" -eq 0 ]
-}
-
-@test "Check file creation with touch" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-touch my_test_file
-ls
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"my_test_file"* ]]  # Ensure the file is listed
-}
-
-
-@test "Check server exit command" {
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-stop-server
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Server stopping."* ]]
-}
-
-@test "Check multi-client handling" {
-    ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF &
-ls
-exit
-EOF
-    wait  # Ensure first client exits before running the second
-
-    run ./dsh -c $SERVER_IP -p $SERVER_PORT <<EOF
-echo Multi-client test
-exit
-EOF
-    [ "$status" -eq 0 ]
-    [[ "$output" == *"Multi-client test"* ]]
-}

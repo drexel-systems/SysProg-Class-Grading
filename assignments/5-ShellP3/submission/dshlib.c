@@ -353,7 +353,6 @@ int build_cmd_list(char *cmd_line, command_list_t *clist)
         if (rc != OK)
         {
             free(cmd_copy);
-            free_cmd_list(clist);
             return rc;
         }
 
@@ -380,7 +379,6 @@ int build_cmd_list(char *cmd_line, command_list_t *clist)
     {
         printf("error: pipe limit reached, piping limited to %d commands\n", CMD_MAX);
         free(cmd_copy);
-        free_cmd_list(clist);
         return ERR_TOO_MANY_COMMANDS;
     }
 
